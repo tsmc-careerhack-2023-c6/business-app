@@ -74,12 +74,23 @@ pub async fn order(
 }
 
 #[get("/record")]
-pub async fn record(pool: web::Data<DbPool>) -> impl Responder {
+pub async fn record(
+    query: web::Query<OrderRecordQuery>,
+    pool: web::Data<DbPool>
+) -> impl Responder {
     use crate::schema::order_details::dsl::*;
-
+    
     let query_result = web::block(move || {
         let mut conn = pool.get().unwrap();
-        order_details.load::<OrderDetail>(&mut conn)
+
+        let start_time = chrono::NaiveDateTime::parse_from_str(&format!("{} 00:00:00", query.date), "%Y-%m-%d %H:%M:%S").unwrap() - chrono::Duration::hours(8);
+        let end_time = chrono::NaiveDateTime::parse_from_str(&format!("{} 23:59:59", query.date), "%Y-%m-%d %H:%M:%S").unwrap() - chrono::Duration::hours(8);
+
+        order_details
+            .filter(location.eq(&query.location))
+            .filter(timestamp.ge(start_time))
+            .filter(timestamp.le(end_time))
+            .load::<OrderDetail>(&mut conn)
     })
         .await
         .unwrap();

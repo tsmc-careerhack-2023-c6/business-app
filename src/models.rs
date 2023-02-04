@@ -82,8 +82,14 @@ impl From<OrderDetail> for OrderRecord {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct OrderReport {
-    location: String,
-    count: i32,
-    material: i32,
-    data: Data,
+    pub location: String,
+    pub count: i32,
+    pub material: i32,
+    pub data: Data,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct OrderRecordQuery {
+    pub location: String,
+    pub date: String,
 }
