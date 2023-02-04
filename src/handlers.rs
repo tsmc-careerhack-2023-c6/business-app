@@ -68,8 +68,30 @@ pub async fn order(
 
     let inserted_order = insert_result.unwrap();
 
-    // convert to OrderPayload
-    let inserted_order_payload = OrderPayload::from(inserted_order);
+    let order_record = OrderRecord::from(inserted_order);
 
-    HttpResponse::Ok().json(inserted_order_payload)
+    HttpResponse::Ok().json(order_record)
+}
+
+#[get("/record")]
+pub async fn record(pool: web::Data<DbPool>) -> impl Responder {
+    use crate::schema::order_details::dsl::*;
+
+    let query_result = web::block(move || {
+        let mut conn = pool.get().unwrap();
+        order_details.load::<OrderDetail>(&mut conn)
+    })
+        .await
+        .unwrap();
+
+    if let Err(err) = query_result {
+        eprintln!("{}", err);
+        return HttpResponse::InternalServerError().finish();
+    }
+
+    let queried_order_details = query_result.unwrap();
+
+    let order_records: Vec<OrderRecord> = queried_order_details.into_iter().map(|order_detail| OrderRecord::from(order_detail)).collect();
+
+    HttpResponse::Ok().json(order_records)
 }

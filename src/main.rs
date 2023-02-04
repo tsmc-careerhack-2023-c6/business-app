@@ -25,7 +25,9 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(pool.clone()))
             .service(
-                web::scope("/api").service(handlers::order)
+                web::scope("/api")
+                    .service(handlers::order)
+                    .service(handlers::record)
             )
     })
     .workers(16)

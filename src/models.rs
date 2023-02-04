@@ -19,21 +19,6 @@ pub struct OrderPayload {
     pub data: Data,
 }
 
-impl From<OrderDetail> for OrderPayload {
-    fn from(order_detail: OrderDetail) -> Self {
-        OrderPayload {
-            location: order_detail.location,
-            timestamp: (order_detail.timestamp + chrono::Duration::hours(8)).and_local_timezone(Asia::Taipei).unwrap().to_rfc3339(),
-            data: Data {
-                a: order_detail.a,
-                b: order_detail.b,
-                c: order_detail.c,
-                d: order_detail.d,
-            },
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone)]
 pub struct OrderDetailFromInventory {
     pub location: String,
@@ -67,6 +52,32 @@ pub struct OrderDetailPayload {
     pub b: i32,
     pub c: i32,
     pub d: i32,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct OrderRecord {
+    pub location: String,
+    pub timestamp: String,
+    pub signature: String,
+    pub material: i32,
+    pub data: Data,
+}
+
+impl From<OrderDetail> for OrderRecord {
+    fn from(order_detail: OrderDetail) -> Self {
+        OrderRecord {
+            location: order_detail.location,
+            timestamp: (order_detail.timestamp + chrono::Duration::hours(8)).and_local_timezone(Asia::Taipei).unwrap().to_rfc3339(),
+            signature: order_detail.signature,
+            material: order_detail.material,
+            data: Data {
+                a: order_detail.a,
+                b: order_detail.b,
+                c: order_detail.c,
+                d: order_detail.d,
+            },
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
