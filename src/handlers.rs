@@ -26,12 +26,6 @@ pub async fn order(
 ) -> impl Responder {
     let order = payload.into_inner();
     
-    // use reqwest to send order to inventory service
-    // and get the response (OrderDetailFromInventory)
-    // and flatten it to (OrderDetailPayload)
-    // and insert it to database
-    // and return the response (OrderDetail)
-    
     let client = reqwest::Client::new();
     let resp_res = client
         .post("http://localhost:8200/api/inventory")
@@ -67,11 +61,15 @@ pub async fn order(
         .await
         .unwrap();
         
-    match insert_result {
-        Ok(order_detail) => HttpResponse::Ok().json(order_detail),
-        Err(e) => {
-            eprintln!("{}", e);
-            HttpResponse::InternalServerError().finish()
-        }
+    if let Err(insert_err) = insert_result {
+        eprintln!("{}", insert_err);
+        return HttpResponse::InternalServerError().finish();
     }
+
+    let inserted_order = insert_result.unwrap();
+
+    // convert to OrderPayload
+    let inserted_order_payload = OrderPayload::from(inserted_order);
+
+    HttpResponse::Ok().json(inserted_order_payload)
 }

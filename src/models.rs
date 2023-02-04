@@ -1,5 +1,6 @@
 use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
+use chrono_tz::Asia;
 
 use crate::schema::order_details;
 
@@ -16,6 +17,21 @@ pub struct OrderPayload {
     pub location: String,
     pub timestamp: String,
     pub data: Data,
+}
+
+impl From<OrderDetail> for OrderPayload {
+    fn from(order_detail: OrderDetail) -> Self {
+        OrderPayload {
+            location: order_detail.location,
+            timestamp: (order_detail.timestamp + chrono::Duration::hours(8)).and_local_timezone(Asia::Taipei).unwrap().to_rfc3339(),
+            data: Data {
+                a: order_detail.a,
+                b: order_detail.b,
+                c: order_detail.c,
+                d: order_detail.d,
+            },
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
