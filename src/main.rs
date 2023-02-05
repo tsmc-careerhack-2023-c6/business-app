@@ -28,6 +28,7 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/api")
                     .service(handlers::order)
                     .service(handlers::record)
+                    .service(handlers::report)
             )
     })
     .workers(16)

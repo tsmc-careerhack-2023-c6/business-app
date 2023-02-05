@@ -60,7 +60,10 @@ pub struct OrderRecord {
     pub timestamp: String,
     pub signature: String,
     pub material: i32,
-    pub data: Data,
+    pub a: i32,
+    pub b: i32,
+    pub c: i32,
+    pub d: i32,
 }
 
 impl From<OrderDetail> for OrderRecord {
@@ -70,12 +73,10 @@ impl From<OrderDetail> for OrderRecord {
             timestamp: (order_detail.timestamp + chrono::Duration::hours(8)).and_local_timezone(Asia::Taipei).unwrap().to_rfc3339(),
             signature: order_detail.signature,
             material: order_detail.material,
-            data: Data {
-                a: order_detail.a,
-                b: order_detail.b,
-                c: order_detail.c,
-                d: order_detail.d,
-            },
+            a: order_detail.a,
+            b: order_detail.b,
+            c: order_detail.c,
+            d: order_detail.d,
         }
     }
 }
@@ -83,13 +84,17 @@ impl From<OrderDetail> for OrderRecord {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct OrderReport {
     pub location: String,
-    pub count: i32,
+    pub date: String,
+    pub count: usize,
     pub material: i32,
-    pub data: Data,
+    pub a: i32,
+    pub b: i32,
+    pub c: i32,
+    pub d: i32,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct OrderRecordQuery {
+#[derive(Serialize, Deserialize, Clone)]
+pub struct OrderQuery {
     pub location: String,
     pub date: String,
 }
