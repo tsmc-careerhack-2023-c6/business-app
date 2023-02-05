@@ -45,16 +45,7 @@ pub async fn order(
 
     let resp = resp_res.unwrap();
 
-    let order_detail_payload = OrderDetailPayload {
-        location: resp.location,
-        timestamp: chrono::DateTime::parse_from_rfc3339(&resp.timestamp).unwrap(),
-        signature: resp.signature,
-        material: resp.material,
-        a: resp.data.a,
-        b: resp.data.b,
-        c: resp.data.c,
-        d: resp.data.d,
-    };
+    let order_detail_payload = OrderDetailPayload::from(resp);
     
     let insert_result = web::block(move || {
         let mut conn = pool.get().unwrap();

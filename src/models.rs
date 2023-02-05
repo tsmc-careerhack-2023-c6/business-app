@@ -54,6 +54,21 @@ pub struct OrderDetailPayload {
     pub d: i32,
 }
 
+impl From<OrderDetailFromInventory> for OrderDetailPayload {
+    fn from(order_detail_from_inventory: OrderDetailFromInventory) -> Self {
+        OrderDetailPayload {
+            location: order_detail_from_inventory.location,
+            timestamp: chrono::DateTime::parse_from_rfc3339(&order_detail_from_inventory.timestamp).unwrap(),
+            signature: order_detail_from_inventory.signature,
+            material: order_detail_from_inventory.material,
+            a: order_detail_from_inventory.data.a,
+            b: order_detail_from_inventory.data.b,
+            c: order_detail_from_inventory.data.c,
+            d: order_detail_from_inventory.data.d,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct OrderRecord {
     pub location: String,
