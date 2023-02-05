@@ -20,6 +20,7 @@ services:
     environment:
       ADMINER_DEFAULT_SERVER: database
   business-app:
+    container_name: business-app
     image: wst24365888/tsmc-careerhack-2023-c6-business-app:latest
     build:
       context: .
@@ -29,5 +30,11 @@ services:
       - 8100:8100
     depends_on:
       - database
+  inventory-service:
+    container_name: inventory-service
+    image: wst24365888/tsmc-careerhack-2023-c6-inventory-service:latest
+    restart: always
+    ports:
+      - 8200:8200
 volumes:
   pgdata:

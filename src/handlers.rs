@@ -30,7 +30,7 @@ pub async fn order(
     
     let client = reqwest::Client::new();
     let resp_res = client
-        .post("http://localhost:8200/api/inventory")
+        .post("http://inventory-service:8200/api/inventory")
         .json(&order)
         .send()
         .await
