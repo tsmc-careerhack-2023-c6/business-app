@@ -1,6 +1,7 @@
 version: '3'
 services:
   database:
+    container_name: database
     image: postgres:latest
     restart: always
     volumes:
@@ -8,7 +9,7 @@ services:
     env_file:
       - db.env
     ports:
-      - '15432:5432'
+      - 5432:5432
   adminer:
     image: adminer:latest
     restart: always
@@ -18,5 +19,15 @@ services:
       - database
     environment:
       ADMINER_DEFAULT_SERVER: database
+  business-app:
+    image: wst24365888/tsmc-careerhack-2023-c6-business-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - 8100:8100
+    depends_on:
+      - database
 volumes:
   pgdata:
