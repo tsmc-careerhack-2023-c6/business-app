@@ -17,7 +17,7 @@ async fn main() -> std::io::Result<()> {
     
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     let pool: DbPool = r2d2::Pool::builder()
         .build(manager)

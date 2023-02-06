@@ -25,12 +25,16 @@ fn insert_order_detail(conn: &mut PgConnection, order_detail_payload: OrderDetai
 pub async fn order(
     payload: web::Json<OrderPayload>,
     pool: web::Data<DbPool>,
-) -> impl Responder {
+) -> impl Responder {    
+    dotenv::dotenv().ok();
+
+    let inventory_url = std::env::var("INVENTORY_URL").expect("INVENTORY_URL must be set");
+
     let order = payload.into_inner();
     
     let client = reqwest::Client::new();
     let resp_res = client
-        .post("http://inventory-service:8200/api/inventory")
+        .post(inventory_url)
         .json(&order)
         .send()
         .await
