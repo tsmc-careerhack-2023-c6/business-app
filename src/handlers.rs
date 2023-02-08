@@ -3,7 +3,7 @@ use std::sync::Arc;
 use actix_web::{get, post, web, HttpResponse, Responder};
 use diesel::prelude::*;
 use diesel::result::Error;
-use fred::{prelude::KeysInterface, types::RedisValue};
+use fred::{prelude::KeysInterface, types::{RedisValue, Expiration}};
 
 use crate::models::*;
 
@@ -154,7 +154,7 @@ pub async fn record(
         .set(
             format!("{}-{}", cloned_query_ref.date, cloned_query_ref.location),
             serde_json::to_string(&order_records).unwrap(),
-            None,
+            Some(Expiration::EX(10)),
             None,
             false,
         )
@@ -266,7 +266,7 @@ pub async fn report(
         .set(
             format!("{}-{}", cloned_query_ref.date, cloned_query_ref.location),
             serde_json::to_string(&order_records).unwrap(),
-            None,
+            Some(Expiration::EX(10)),
             None,
             false,
         )
