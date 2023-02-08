@@ -268,7 +268,7 @@ pub async fn report(
         .redis_pool
         .set(
             &key,
-            serde_json::to_string(&order_records).unwrap(),
+            serde_json::to_string(&order_report).unwrap(),
             Some(Expiration::EX(10)),
             None,
             false,
