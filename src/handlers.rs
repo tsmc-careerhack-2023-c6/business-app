@@ -10,7 +10,10 @@ use crate::models::*;
 
 // type DbError = Box<dyn std::error::Error + Send + Sync>;
 
-fn insert_order_detail(conn: &mut PgConnection, order_detail_payload: OrderDetailPayload) -> Result<OrderDetail, Error> {
+fn insert_order_detail(
+    conn: &mut PgConnection,
+    order_detail_payload: OrderDetailPayload,
+) -> Result<OrderDetail, Error> {
     use crate::schema::order_details::dsl::*;
 
     let result = diesel::insert_into(order_details)
@@ -22,16 +25,13 @@ fn insert_order_detail(conn: &mut PgConnection, order_detail_payload: OrderDetai
 }
 
 #[post("/order")]
-pub async fn order(
-    payload: web::Json<OrderPayload>,
-    pool: web::Data<DbPool>,
-) -> impl Responder {    
+pub async fn order(payload: web::Json<OrderPayload>, pool: web::Data<DbPool>) -> impl Responder {
     dotenv::dotenv().ok();
 
     let inventory_url = std::env::var("INVENTORY_URL").expect("INVENTORY_URL must be set");
 
     let order = payload.into_inner();
-    
+
     let client = reqwest::Client::new();
     let resp_res = client
         .post(inventory_url)
@@ -41,7 +41,7 @@ pub async fn order(
         .unwrap()
         .json::<OrderDetailFromInventory>()
         .await;
-    
+
     if let Err(resp_err) = resp_res {
         eprintln!("{}", resp_err);
         return HttpResponse::InternalServerError().finish();
@@ -50,16 +50,22 @@ pub async fn order(
     let resp = resp_res.unwrap();
 
     let order_detail_payload = OrderDetailPayload::from(resp);
-    
-    let insert_result = web::block(move || {
+
+    let web_block_result = web::block(move || {
         let mut conn = pool.get().unwrap();
         insert_order_detail(&mut conn, order_detail_payload)
     })
-        .await
-        .unwrap();
-        
-    if let Err(insert_err) = insert_result {
-        eprintln!("{}", insert_err);
+    .await;
+
+    if let Err(err) = web_block_result {
+        eprintln!("{}", err);
+        return HttpResponse::InternalServerError().finish();
+    }
+
+    let insert_result = web_block_result.unwrap();
+
+    if let Err(err) = insert_result {
+        eprintln!("{}", err);
         return HttpResponse::InternalServerError().finish();
     }
 
@@ -71,17 +77,24 @@ pub async fn order(
 }
 
 #[get("/record")]
-pub async fn record(
-    query: web::Query<OrderQuery>,
-    pool: web::Data<DbPool>
-) -> impl Responder {
+pub async fn record(query: web::Query<OrderQuery>, pool: web::Data<DbPool>) -> impl Responder {
     use crate::schema::order_details::dsl::*;
-    
-    let query_result = web::block(move || {
+
+    let web_block_result = web::block(move || {
         let mut conn = pool.get().unwrap();
 
-        let start_time = chrono::NaiveDateTime::parse_from_str(&format!("{} 00:00:00", query.date), "%Y-%m-%d %H:%M:%S").unwrap() - chrono::Duration::hours(8);
-        let end_time = chrono::NaiveDateTime::parse_from_str(&format!("{} 23:59:59", query.date), "%Y-%m-%d %H:%M:%S").unwrap() - chrono::Duration::hours(8);
+        let start_time = chrono::NaiveDateTime::parse_from_str(
+            &format!("{} 00:00:00", query.date),
+            "%Y-%m-%d %H:%M:%S",
+        )
+        .unwrap()
+            - chrono::Duration::hours(8);
+        let end_time = chrono::NaiveDateTime::parse_from_str(
+            &format!("{} 23:59:59", query.date),
+            "%Y-%m-%d %H:%M:%S",
+        )
+        .unwrap()
+            - chrono::Duration::hours(8);
 
         order_details
             .filter(location.eq(&query.location))
@@ -89,8 +102,14 @@ pub async fn record(
             .filter(timestamp.le(end_time))
             .load::<OrderDetail>(&mut conn)
     })
-        .await
-        .unwrap();
+    .await;
+
+    if let Err(err) = web_block_result {
+        eprintln!("{}", err);
+        return HttpResponse::InternalServerError().finish();
+    }
+
+    let query_result = web_block_result.unwrap();
 
     if let Err(err) = query_result {
         eprintln!("{}", err);
@@ -99,26 +118,36 @@ pub async fn record(
 
     let queried_order_details = query_result.unwrap();
 
-    let order_records: Vec<OrderRecord> = queried_order_details.into_iter().map(|order_detail| OrderRecord::from(order_detail)).collect();
+    let order_records: Vec<OrderRecord> = queried_order_details
+        .into_iter()
+        .map(|order_detail| OrderRecord::from(order_detail))
+        .collect();
 
     HttpResponse::Ok().json(order_records)
 }
 
 #[get("/report")]
-pub async fn report(
-    query: web::Query<OrderQuery>,
-    pool: web::Data<DbPool>
-) -> impl Responder {
+pub async fn report(query: web::Query<OrderQuery>, pool: web::Data<DbPool>) -> impl Responder {
     use crate::schema::order_details::dsl::*;
 
     let query_ref = Arc::new(query);
     let query_ref_clone = query_ref.clone();
-    
-    let query_result = web::block(move || {
+
+    let web_block_result = web::block(move || {
         let mut conn = pool.get().unwrap();
 
-        let start_time = chrono::NaiveDateTime::parse_from_str(&format!("{} 00:00:00", query_ref_clone.date), "%Y-%m-%d %H:%M:%S").unwrap() - chrono::Duration::hours(8);
-        let end_time = chrono::NaiveDateTime::parse_from_str(&format!("{} 23:59:59", query_ref_clone.date), "%Y-%m-%d %H:%M:%S").unwrap() - chrono::Duration::hours(8);
+        let start_time = chrono::NaiveDateTime::parse_from_str(
+            &format!("{} 00:00:00", query_ref_clone.date),
+            "%Y-%m-%d %H:%M:%S",
+        )
+        .unwrap()
+            - chrono::Duration::hours(8);
+        let end_time = chrono::NaiveDateTime::parse_from_str(
+            &format!("{} 23:59:59", query_ref_clone.date),
+            "%Y-%m-%d %H:%M:%S",
+        )
+        .unwrap()
+            - chrono::Duration::hours(8);
 
         order_details
             .filter(location.eq(&query_ref_clone.location))
@@ -126,8 +155,14 @@ pub async fn report(
             .filter(timestamp.le(end_time))
             .load::<OrderDetail>(&mut conn)
     })
-        .await
-        .unwrap();
+    .await;
+
+    if let Err(err) = web_block_result {
+        eprintln!("{}", err);
+        return HttpResponse::InternalServerError().finish();
+    }
+
+    let query_result = web_block_result.unwrap();
 
     if let Err(err) = query_result {
         eprintln!("{}", err);
@@ -136,17 +171,35 @@ pub async fn report(
 
     let queried_order_details = query_result.unwrap();
 
-    let order_records: Vec<OrderRecord> = queried_order_details.into_iter().map(|order_detail| OrderRecord::from(order_detail)).collect();
-    
+    let order_records: Vec<OrderRecord> = queried_order_details
+        .into_iter()
+        .map(|order_detail| OrderRecord::from(order_detail))
+        .collect();
+
     let order_report = OrderReport {
         location: query_ref.location.clone(),
         date: query_ref.date.clone(),
         count: order_records.len(),
-        material: order_records.iter().map(|order_record| order_record.material).sum(),
-        a: order_records.iter().map(|order_record| order_record.a).sum(),
-        b: order_records.iter().map(|order_record| order_record.b).sum(),
-        c: order_records.iter().map(|order_record| order_record.c).sum(),
-        d: order_records.iter().map(|order_record| order_record.d).sum(),
+        material: order_records
+            .iter()
+            .map(|order_record| order_record.material)
+            .sum(),
+        a: order_records
+            .iter()
+            .map(|order_record| order_record.a)
+            .sum(),
+        b: order_records
+            .iter()
+            .map(|order_record| order_record.b)
+            .sum(),
+        c: order_records
+            .iter()
+            .map(|order_record| order_record.c)
+            .sum(),
+        d: order_records
+            .iter()
+            .map(|order_record| order_record.d)
+            .sum(),
     };
 
     HttpResponse::Ok().json(order_report)

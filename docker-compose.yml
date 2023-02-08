@@ -30,6 +30,8 @@ services:
       - 8100:8100
     depends_on:
       - database
+    env_file:
+      - .env
   inventory-service:
     container_name: inventory-service
     image: wst24365888/tsmc-careerhack-2023-c6-inventory-service:latest
