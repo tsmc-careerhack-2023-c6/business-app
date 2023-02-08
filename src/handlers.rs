@@ -86,13 +86,14 @@ pub async fn record(
     use crate::schema::order_details::dsl::*;
 
     let query_ref = Arc::new(query);
-    let cloned_query_ref = query_ref.clone();
 
     let cloned_app_state = app_state.clone();
 
+    let key = format!("record:{}:{}", query_ref.date, query_ref.location);
+
     let redis_result: RedisValue = app_state
         .redis_pool
-        .get(format!("{}-{}", query_ref.date, query_ref.location))
+        .get(&key)
         .await
         .unwrap();
 
@@ -152,7 +153,7 @@ pub async fn record(
     let _: () = cloned_app_state
         .redis_pool
         .set(
-            format!("{}-{}", cloned_query_ref.date, cloned_query_ref.location),
+            &key,
             serde_json::to_string(&order_records).unwrap(),
             Some(Expiration::EX(10)),
             None,
@@ -176,9 +177,11 @@ pub async fn report(
 
     let cloned_app_state = app_state.clone();
 
+    let key = format!("report:{}:{}", query_ref.date, query_ref.location);
+
     let redis_result: RedisValue = app_state
         .redis_pool
-        .get(format!("{}-{}", query_ref.date, query_ref.location))
+        .get(&key)
         .await
         .unwrap();
 
@@ -264,7 +267,7 @@ pub async fn report(
     let _: () = cloned_app_state
         .redis_pool
         .set(
-            format!("{}-{}", cloned_query_ref.date, cloned_query_ref.location),
+            &key,
             serde_json::to_string(&order_records).unwrap(),
             Some(Expiration::EX(10)),
             None,
