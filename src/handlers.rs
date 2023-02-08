@@ -188,7 +188,7 @@ pub async fn report(
     if let RedisValue::String(redis_string) = redis_result {
         println!("Found cache in redis");
 
-        let order_report: Vec<OrderReport> = serde_json::from_str(&redis_string).unwrap();
+        let order_report: OrderReport = serde_json::from_str(&redis_string).unwrap();
 
         return HttpResponse::Ok().json(order_report);
     }
