@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
-use super::DbPool;
-
 use actix_web::{get, post, web, HttpResponse, Responder};
 use diesel::prelude::*;
 use diesel::result::Error;
+use fred::{prelude::KeysInterface, types::RedisValue};
 
 use crate::models::*;
 
@@ -25,7 +24,10 @@ fn insert_order_detail(
 }
 
 #[post("/order")]
-pub async fn order(payload: web::Json<OrderPayload>, pool: web::Data<DbPool>) -> impl Responder {
+pub async fn order(
+    payload: web::Json<OrderPayload>,
+    app_state: web::Data<AppState>,
+) -> impl Responder {
     dotenv::dotenv().ok();
 
     let inventory_url = std::env::var("INVENTORY_URL").expect("INVENTORY_URL must be set");
@@ -52,7 +54,7 @@ pub async fn order(payload: web::Json<OrderPayload>, pool: web::Data<DbPool>) ->
     let order_detail_payload = OrderDetailPayload::from(resp);
 
     let web_block_result = web::block(move || {
-        let mut conn = pool.get().unwrap();
+        let mut conn = app_state.db_pool.get().unwrap();
         insert_order_detail(&mut conn, order_detail_payload)
     })
     .await;
@@ -77,27 +79,49 @@ pub async fn order(payload: web::Json<OrderPayload>, pool: web::Data<DbPool>) ->
 }
 
 #[get("/record")]
-pub async fn record(query: web::Query<OrderQuery>, pool: web::Data<DbPool>) -> impl Responder {
+pub async fn record(
+    query: web::Query<OrderQuery>,
+    app_state: web::Data<AppState>,
+) -> impl Responder {
     use crate::schema::order_details::dsl::*;
 
+    let query_ref = Arc::new(query);
+    let cloned_query_ref = query_ref.clone();
+
+    let cloned_app_state = app_state.clone();
+
+    let redis_result: RedisValue = app_state
+        .redis_pool
+        .get(format!("{}-{}", query_ref.date, query_ref.location))
+        .await
+        .unwrap();
+
+    if let RedisValue::String(redis_string) = redis_result {
+        println!("Found cache in redis");
+
+        let order_records: Vec<OrderRecord> = serde_json::from_str(&redis_string).unwrap();
+
+        return HttpResponse::Ok().json(order_records);
+    }
+
     let web_block_result = web::block(move || {
-        let mut conn = pool.get().unwrap();
+        let mut conn = app_state.db_pool.get().unwrap();
 
         let start_time = chrono::NaiveDateTime::parse_from_str(
-            &format!("{} 00:00:00", query.date),
+            &format!("{} 00:00:00", query_ref.date),
             "%Y-%m-%d %H:%M:%S",
         )
         .unwrap()
             - chrono::Duration::hours(8);
         let end_time = chrono::NaiveDateTime::parse_from_str(
-            &format!("{} 23:59:59", query.date),
+            &format!("{} 23:59:59", query_ref.date),
             "%Y-%m-%d %H:%M:%S",
         )
         .unwrap()
             - chrono::Duration::hours(8);
 
         order_details
-            .filter(location.eq(&query.location))
+            .filter(location.eq(&query_ref.location))
             .filter(timestamp.ge(start_time))
             .filter(timestamp.le(end_time))
             .load::<OrderDetail>(&mut conn)
@@ -123,34 +147,67 @@ pub async fn record(query: web::Query<OrderQuery>, pool: web::Data<DbPool>) -> i
         .map(|order_detail| OrderRecord::from(order_detail))
         .collect();
 
+    println!("Set cache in redis");
+
+    let _: () = cloned_app_state
+        .redis_pool
+        .set(
+            format!("{}-{}", cloned_query_ref.date, cloned_query_ref.location),
+            serde_json::to_string(&order_records).unwrap(),
+            None,
+            None,
+            false,
+        )
+        .await
+        .unwrap();
+
     HttpResponse::Ok().json(order_records)
 }
 
 #[get("/report")]
-pub async fn report(query: web::Query<OrderQuery>, pool: web::Data<DbPool>) -> impl Responder {
+pub async fn report(
+    query: web::Query<OrderQuery>,
+    app_state: web::Data<AppState>,
+) -> impl Responder {
     use crate::schema::order_details::dsl::*;
 
     let query_ref = Arc::new(query);
-    let query_ref_clone = query_ref.clone();
+    let cloned_query_ref = query_ref.clone();
+
+    let cloned_app_state = app_state.clone();
+
+    let redis_result: RedisValue = app_state
+        .redis_pool
+        .get(format!("{}-{}", query_ref.date, query_ref.location))
+        .await
+        .unwrap();
+
+    if let RedisValue::String(redis_string) = redis_result {
+        println!("Found cache in redis");
+
+        let order_records: Vec<OrderRecord> = serde_json::from_str(&redis_string).unwrap();
+
+        return HttpResponse::Ok().json(order_records);
+    }
 
     let web_block_result = web::block(move || {
-        let mut conn = pool.get().unwrap();
+        let mut conn = app_state.db_pool.get().unwrap();
 
         let start_time = chrono::NaiveDateTime::parse_from_str(
-            &format!("{} 00:00:00", query_ref_clone.date),
+            &format!("{} 00:00:00", query_ref.date),
             "%Y-%m-%d %H:%M:%S",
         )
         .unwrap()
             - chrono::Duration::hours(8);
         let end_time = chrono::NaiveDateTime::parse_from_str(
-            &format!("{} 23:59:59", query_ref_clone.date),
+            &format!("{} 23:59:59", query_ref.date),
             "%Y-%m-%d %H:%M:%S",
         )
         .unwrap()
             - chrono::Duration::hours(8);
 
         order_details
-            .filter(location.eq(&query_ref_clone.location))
+            .filter(location.eq(&query_ref.location))
             .filter(timestamp.ge(start_time))
             .filter(timestamp.le(end_time))
             .load::<OrderDetail>(&mut conn)
@@ -177,8 +234,8 @@ pub async fn report(query: web::Query<OrderQuery>, pool: web::Data<DbPool>) -> i
         .collect();
 
     let order_report = OrderReport {
-        location: query_ref.location.clone(),
-        date: query_ref.date.clone(),
+        location: cloned_query_ref.location.clone(),
+        date: cloned_query_ref.date.clone(),
         count: order_records.len(),
         material: order_records
             .iter()
@@ -201,6 +258,20 @@ pub async fn report(query: web::Query<OrderQuery>, pool: web::Data<DbPool>) -> i
             .map(|order_record| order_record.d)
             .sum(),
     };
+
+    println!("Set cache in redis");
+
+    let _: () = cloned_app_state
+        .redis_pool
+        .set(
+            format!("{}-{}", cloned_query_ref.date, cloned_query_ref.location),
+            serde_json::to_string(&order_records).unwrap(),
+            None,
+            None,
+            false,
+        )
+        .await
+        .unwrap();
 
     HttpResponse::Ok().json(order_report)
 }
