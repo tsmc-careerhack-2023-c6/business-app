@@ -8,7 +8,7 @@ COPY Cargo.toml .
 COPY Cargo.lock .
 COPY src src
 
-RUN cargo build --release
+RUN cargo build --release -j16
 
 FROM debian:bullseye-slim
 

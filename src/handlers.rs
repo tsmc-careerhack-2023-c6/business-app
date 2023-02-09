@@ -1,26 +1,28 @@
 use std::sync::Arc;
 
 use actix_web::{get, post, web, HttpResponse, Responder};
+use bytes::Bytes;
 use diesel::prelude::*;
-use diesel::result::Error;
+// use diesel::result::Error;
+use uuid::Uuid;
 
 use crate::models::*;
 
 // type DbError = Box<dyn std::error::Error + Send + Sync>;
 
-fn insert_order_detail(
-    conn: &mut PgConnection,
-    order_detail_payload: OrderDetailPayload,
-) -> Result<OrderDetail, Error> {
-    use crate::schema::order_details::dsl::*;
+// fn insert_order_detail(
+//     conn: &mut PgConnection,
+//     order_detail_payload: OrderDetailPayload,
+// ) -> Result<OrderDetail, Error> {
+//     use crate::schema::order_details::dsl::*;
 
-    let result = diesel::insert_into(order_details)
-        .values(&order_detail_payload.clone())
-        .returning((id, location, timestamp, signature, material, a, b, c, d))
-        .get_result::<OrderDetail>(conn);
+//     let result = diesel::insert_into(order_details)
+//         .values(&order_detail_payload.clone())
+//         .returning((id, location, timestamp, signature, material, a, b, c, d))
+//         .get_result::<OrderDetail>(conn);
 
-    result
-}
+//     result
+// }
 
 #[post("/order")]
 pub async fn order(
@@ -52,27 +54,31 @@ pub async fn order(
 
     let order_detail_payload = OrderDetailPayload::from(resp);
 
-    let web_block_result = web::block(move || {
-        let mut conn = app_state.db_pool.get().unwrap();
-        insert_order_detail(&mut conn, order_detail_payload)
-    })
-    .await;
+    let response = app_state.nats_client.request(format!("request.{}", Uuid::new_v4()), Bytes::from(serde_json::to_string(&order_detail_payload).unwrap())).await.unwrap();
 
-    if let Err(err) = web_block_result {
-        eprintln!("{}", err);
-        return HttpResponse::InternalServerError().finish();
-    }
+    let order_record: OrderRecord = serde_json::from_slice(&response.payload).unwrap();
+    
+    // let web_block_result = web::block(move || {
+    //     let mut conn = app_state.db_pool.get().unwrap();
+    //     insert_order_detail(&mut conn, order_detail_payload)
+    // })
+    // .await;
 
-    let insert_result = web_block_result.unwrap();
+    // if let Err(err) = web_block_result {
+    //     eprintln!("{}", err);
+    //     return HttpResponse::InternalServerError().finish();
+    // }
 
-    if let Err(err) = insert_result {
-        eprintln!("{}", err);
-        return HttpResponse::InternalServerError().finish();
-    }
+    // let insert_result = web_block_result.unwrap();
 
-    let inserted_order = insert_result.unwrap();
+    // if let Err(err) = insert_result {
+    //     eprintln!("{}", err);
+    //     return HttpResponse::InternalServerError().finish();
+    // }
 
-    let order_record = OrderRecord::from(inserted_order);
+    // let inserted_order = insert_result.unwrap();
+
+    // let order_record = OrderRecord::from(inserted_order);
 
     HttpResponse::Ok().json(order_record)
 }

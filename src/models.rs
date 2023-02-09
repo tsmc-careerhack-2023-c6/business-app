@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_nats::Client;
 use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
 use chrono_tz::Asia;
@@ -9,6 +10,7 @@ use crate::schema::order_details;
 pub struct AppState {
     pub db_pool: Arc<crate::DbPool>,
     // pub redis_pool: Arc<RedisPool>,
+    pub nats_client: Arc<Client>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

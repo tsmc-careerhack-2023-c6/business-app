@@ -31,31 +31,38 @@ services:
     depends_on:
       - database
     env_file:
-      - .env
+      - prod.env
   inventory-service:
     container_name: inventory-service
     image: wst24365888/tsmc-careerhack-2023-c6-inventory-service:latest
     restart: always
     ports:
       - 8200:8200
-  redis:
-    container_name: redis
-    image: redis:latest
+  # redis:
+  #   container_name: redis
+  #   image: redis:latest
+  #   restart: always
+  #   ports:
+  #     - 6379:6379
+  #   volumes:
+  #     - redis-data:/data
+  #   command:
+  #     - /bin/sh
+  #     - -c
+  #     # - Double dollars, so that the variable is not expanded by Docker Compose
+  #     # - Surround by quotes, so that the shell does not split the password
+  #     # - The ${variable:?message} syntax causes shell to exit with a non-zero
+  #     #   code and print a message, when the variable is not set or empty
+  #     - redis-server --requirepass "$${REDIS_PASSWORD:?REDIS_PASSWORD variable is not set}"
+  #   env_file:
+  #     - redis.env
+  nats:
+    container_name: nats
+    image: nats:latest
     restart: always
     ports:
-      - 6379:6379
-    volumes:
-      - redis-data:/data
-    command:
-      - /bin/sh
-      - -c
-      # - Double dollars, so that the variable is not expanded by Docker Compose
-      # - Surround by quotes, so that the shell does not split the password
-      # - The ${variable:?message} syntax causes shell to exit with a non-zero
-      #   code and print a message, when the variable is not set or empty
-      - redis-server --requirepass "$${REDIS_PASSWORD:?REDIS_PASSWORD variable is not set}"
-    env_file:
-      - redis.env
+      - 4222:4222
+      - 8222:8222
 volumes:
   pgdata:
   redis-data:
