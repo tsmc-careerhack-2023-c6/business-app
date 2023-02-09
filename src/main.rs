@@ -40,7 +40,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(AppState {
                 db_pool: database_pool.clone(),
-                redis_pool: redis_pool.clone(),
+                // redis_pool: redis_pool.clone(),
             }))
             .wrap(middleware::Logger::default())
             .service(

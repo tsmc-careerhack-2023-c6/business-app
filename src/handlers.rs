@@ -3,7 +3,6 @@ use std::sync::Arc;
 use actix_web::{get, post, web, HttpResponse, Responder};
 use diesel::prelude::*;
 use diesel::result::Error;
-use fred::{prelude::KeysInterface, types::{RedisValue, Expiration}};
 
 use crate::models::*;
 
@@ -87,23 +86,23 @@ pub async fn record(
 
     let query_ref = Arc::new(query);
 
-    let cloned_app_state = app_state.clone();
+    // let cloned_app_state = app_state.clone();
 
-    let key = format!("record:{}:{}", query_ref.date, query_ref.location);
+    // let key = format!("record:{}:{}", query_ref.date, query_ref.location);
 
-    let redis_result: RedisValue = app_state
-        .redis_pool
-        .get(&key)
-        .await
-        .unwrap();
+    // let redis_result: RedisValue = app_state
+    //     .redis_pool
+    //     .get(&key)
+    //     .await
+    //     .unwrap();
 
-    if let RedisValue::String(redis_string) = redis_result {
-        println!("Found cache in redis");
+    // if let RedisValue::String(redis_string) = redis_result {
+    //     println!("Found cache in redis");
 
-        let order_records: Vec<OrderRecord> = serde_json::from_str(&redis_string).unwrap();
+    //     let order_records: Vec<OrderRecord> = serde_json::from_str(&redis_string).unwrap();
 
-        return HttpResponse::Ok().json(order_records);
-    }
+    //     return HttpResponse::Ok().json(order_records);
+    // }
 
     let web_block_result = web::block(move || {
         let mut conn = app_state.db_pool.get().unwrap();
@@ -148,19 +147,19 @@ pub async fn record(
         .map(|order_detail| OrderRecord::from(order_detail))
         .collect();
 
-    println!("Set cache in redis");
+    // println!("Set cache in redis");
 
-    let _: () = cloned_app_state
-        .redis_pool
-        .set(
-            &key,
-            serde_json::to_string(&order_records).unwrap(),
-            Some(Expiration::EX(10)),
-            None,
-            false,
-        )
-        .await
-        .unwrap();
+    // let _: () = cloned_app_state
+    //     .redis_pool
+    //     .set(
+    //         &key,
+    //         serde_json::to_string(&order_records).unwrap(),
+    //         Some(Expiration::EX(10)),
+    //         None,
+    //         false,
+    //     )
+    //     .await
+    //     .unwrap();
 
     HttpResponse::Ok().json(order_records)
 }
@@ -175,23 +174,23 @@ pub async fn report(
     let query_ref = Arc::new(query);
     let cloned_query_ref = query_ref.clone();
 
-    let cloned_app_state = app_state.clone();
+    // let cloned_app_state = app_state.clone();
 
-    let key = format!("report:{}:{}", query_ref.date, query_ref.location);
+    // let key = format!("report:{}:{}", query_ref.date, query_ref.location);
 
-    let redis_result: RedisValue = app_state
-        .redis_pool
-        .get(&key)
-        .await
-        .unwrap();
+    // let redis_result: RedisValue = app_state
+    //     .redis_pool
+    //     .get(&key)
+    //     .await
+    //     .unwrap();
 
-    if let RedisValue::String(redis_string) = redis_result {
-        println!("Found cache in redis");
+    // if let RedisValue::String(redis_string) = redis_result {
+    //     println!("Found cache in redis");
 
-        let order_report: OrderReport = serde_json::from_str(&redis_string).unwrap();
+    //     let order_report: OrderReport = serde_json::from_str(&redis_string).unwrap();
 
-        return HttpResponse::Ok().json(order_report);
-    }
+    //     return HttpResponse::Ok().json(order_report);
+    // }
 
     let web_block_result = web::block(move || {
         let mut conn = app_state.db_pool.get().unwrap();
@@ -262,19 +261,19 @@ pub async fn report(
             .sum(),
     };
 
-    println!("Set cache in redis");
+    // println!("Set cache in redis");
 
-    let _: () = cloned_app_state
-        .redis_pool
-        .set(
-            &key,
-            serde_json::to_string(&order_report).unwrap(),
-            Some(Expiration::EX(10)),
-            None,
-            false,
-        )
-        .await
-        .unwrap();
+    // let _: () = cloned_app_state
+    //     .redis_pool
+    //     .set(
+    //         &key,
+    //         serde_json::to_string(&order_report).unwrap(),
+    //         Some(Expiration::EX(10)),
+    //         None,
+    //         false,
+    //     )
+    //     .await
+    //     .unwrap();
 
     HttpResponse::Ok().json(order_report)
 }
