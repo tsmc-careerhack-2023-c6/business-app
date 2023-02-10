@@ -12,9 +12,12 @@ COPY src src
 RUN rustup component add llvm-tools-preview
 RUN cargo install cargo-pgo
 
-RUN RUSTFLAGS="-C target-cpu=native -C target-feature=+sse3,+avx2,+fma" cargo pgo instrument build --release -j16
+EXPOSE 8100
+
+RUN RUSTFLAGS="-C target-cpu=native -C target-feature=+sse3,+avx2,+fma" cargo pgo instrument build -- --release -j16
 RUN cargo pgo run &
-RUN wrk -t2 -c64 -d300s --latency http://127.0.0.1:8100/api/health
+RUN sleep 300
+RUN wrk -t2 -c64 -d300s --latency http://localhost:8100/api/health
 RUN killall business-app
 
 RUN RUSTFLAGS="-C target-cpu=native -C target-feature=+sse3,+avx2,+fma" cargo pgo optimize
