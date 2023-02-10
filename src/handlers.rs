@@ -17,18 +17,7 @@ pub async fn order(
 
     let order_payload = payload.into_inner();
 
-    let inventory_resp = app_state.nats_client.request(format!("inventory.{}", i), Bytes::from(serde_json::to_string(&order_payload).unwrap())).await.unwrap();
-    let order_detail_from_inevntory_result: Result<OrderDetailFromInventory, serde_json::Error> = serde_json::from_slice(&inventory_resp.payload);
-    
-    if let Err(err) = order_detail_from_inevntory_result {
-        eprintln!("Error: {}", err);
-        return HttpResponse::InternalServerError().finish();
-    }
-
-    let order_detail_from_inevntory: OrderDetailFromInventory = order_detail_from_inevntory_result.unwrap();
-    let order_detail_payload = OrderDetailPayload::from(order_detail_from_inevntory);
-
-    let _  = app_state.nats_client.publish(format!("request.{}", i), Bytes::from(serde_json::to_string(&order_detail_payload).unwrap())).await;
+    let _ = app_state.nats_client.publish(format!("inventory_to_db.{}", i), Bytes::from(serde_json::to_string(&order_payload).unwrap())).await.unwrap();
 
     HttpResponse::Ok().finish()
 }
