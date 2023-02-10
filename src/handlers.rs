@@ -4,7 +4,6 @@ use actix_web::{get, post, web, HttpResponse, Responder};
 use bytes::Bytes;
 use diesel::prelude::*;
 // use diesel::result::Error;
-use uuid::Uuid;
 
 use crate::models::*;
 
@@ -54,7 +53,8 @@ pub async fn order(
 
     let order_detail_payload = OrderDetailPayload::from(resp);
 
-    let response = app_state.nats_client.request(format!("request.{}", Uuid::new_v4()), Bytes::from(serde_json::to_string(&order_detail_payload).unwrap())).await.unwrap();
+    let i = rand::random::<u8>() % 16;
+    let response = app_state.nats_client.request(format!("request.{}", i), Bytes::from(serde_json::to_string(&order_detail_payload).unwrap())).await.unwrap();
 
     let order_record: OrderRecord = serde_json::from_slice(&response.payload).unwrap();
     

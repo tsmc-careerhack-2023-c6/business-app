@@ -9,7 +9,7 @@ services:
     env_file:
       - db.env
     ports:
-      - 5432:5432
+      - 15432:5432
   adminer:
     image: adminer:latest
     restart: always

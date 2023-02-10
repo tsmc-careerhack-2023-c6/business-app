@@ -6,7 +6,7 @@ use std::sync::Arc;
 use actix_web::{middleware, web, App, HttpServer};
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
-use models::{AppState, OrderDetailPayload, OrderDetail};
+use models::{AppState, OrderDetail, OrderDetailPayload};
 
 use bytes::Bytes;
 use futures::StreamExt;
@@ -39,47 +39,69 @@ async fn main() -> std::io::Result<()> {
 
     let nats_url = std::env::var("NATS_URL").expect("NATS_URL must be set");
     let nats_client = Arc::new(async_nats::connect(&nats_url).await.unwrap());
-    let mut subscribtion = nats_client
-        .subscribe("request.*".into())
-        .await
-        .unwrap()
-        .take(16);
 
     let db_pool = database_pool.clone();
 
-    tokio::spawn({
-        let nats_client = nats_client.clone();
-        async move {
-            while let Some(request) = subscribtion.next().await {
-                if let Some(reply) = request.reply {
-                    use crate::schema::order_details::dsl::*;
+    for i in 0..16 {
+        tokio::spawn({
+            let db_pool = db_pool.clone();
+            let nats_client = nats_client.clone();
 
-                    let data = request.payload;
-                    
-                    let mut conn = db_pool.get().unwrap();
-                    // deserialize the payload
-                    let order_detail_payload: OrderDetailPayload = serde_json::from_slice(&data).unwrap();
-                    // insert the payload into database
-                    let order_detail = diesel::insert_into(order_details)
-                        .values(&order_detail_payload.clone())
-                        .returning((id, location, timestamp, signature, material, a, b, c, d))
-                        .get_result::<OrderDetail>(&mut conn);
+            let mut subscribtion = nats_client
+                .subscribe(format!("request.{}", i).into())
+                .await
+                .unwrap();
 
-                    let order_detail = match order_detail {
-                        Ok(order_detail) => order_detail,
-                        Err(e) => {
-                            println!("Error: {}", e);
-                            continue;
+            async move {
+                while let Some(request) = subscribtion.next().await {
+                    if let Some(reply) = request.reply {
+                        use crate::schema::order_details::dsl::*;
+
+                        let data = request.payload;
+
+                        loop {
+                            let reply_cloned = reply.clone();
+                            let mut conn = match db_pool.get() {
+                                Ok(conn) => conn,
+                                Err(e) => {
+                                    println!("Error: {}", e);
+                                    continue;
+                                }
+                            };
+
+                            // deserialize the payload
+                            let order_detail_payload: OrderDetailPayload =
+                                serde_json::from_slice(&data).unwrap();
+                            // insert the payload into database
+                            let order_detail = diesel::insert_into(order_details)
+                                .values(&order_detail_payload.clone())
+                                .returning((
+                                    id, location, timestamp, signature, material, a, b, c, d,
+                                ))
+                                .get_result::<OrderDetail>(&mut conn);
+
+                            let order_detail = match order_detail {
+                                Ok(order_detail) => order_detail,
+                                Err(e) => {
+                                    println!("Error: {}", e);
+                                    continue;
+                                }
+                            };
+
+                            let order_detail = serde_json::to_string(&order_detail).unwrap();
+                            nats_client
+                                .publish(reply_cloned, Bytes::from(order_detail))
+                                .await
+                                .unwrap();
+
+                            break;
                         }
-                    };
-                    
-                    let order_detail = serde_json::to_string(&order_detail).unwrap();
-                    nats_client.publish(reply, Bytes::from(order_detail)).await.unwrap();
+                    }
                 }
+                Ok::<(), async_nats::Error>(())
             }
-            Ok::<(), async_nats::Error>(())
-        }
-    });
+        });
+    }
 
     let db_pool = database_pool.clone();
 
