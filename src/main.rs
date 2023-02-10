@@ -4,6 +4,7 @@ extern crate diesel;
 use std::sync::Arc;
 
 use actix_web::{middleware, web, App, HttpServer};
+use bytes::Bytes;
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
 use models::{AppState, OrderDetailPayload, OrderDetailFromInventory, OrderPayload};
@@ -30,36 +31,28 @@ async fn main() -> std::io::Result<()> {
             .expect("Failed to create pool."),
     );
 
-    // let redis_url = std::env::var("REDIS_URL").expect("REDIS_URL must be set");
-    // let redis_client = RedisConfig::from_url(&redis_url).unwrap();
-    // let redis_policy = ReconnectPolicy::default();
-    // let redis_pool = Arc::new(RedisPool::new(redis_client, 10).unwrap());
-    // redis_pool.connect(Some(redis_policy));
-
     let nats_url = std::env::var("NATS_URL").expect("NATS_URL must be set");
     let nats_client = Arc::new(async_nats::connect(&nats_url).await.unwrap());
-    
-    let inventory_url = std::env::var("INVENTORY_URL").expect("INVENTORY_URL must be set");
-    let db_pool = database_pool.clone();
 
     let nats_topic_prefix = std::env::var("NATS_TOPIC_PREFIX").expect("NATS_TOPIC_PREFIX must be set");
+    
+    let inventory_url = std::env::var("INVENTORY_URL").expect("INVENTORY_URL must be set");
 
     for i in 0..16 {
         let inventory_url_cloned = inventory_url.clone();
 
         tokio::spawn({
-            let db_pool = db_pool.clone();
             let nats_client = nats_client.clone();
 
             let mut subscribtion = nats_client
-                .subscribe(format!("{}_inventory_to_db.{}", nats_topic_prefix, i).into())
+                .subscribe(format!("{}:inventory:{}", nats_topic_prefix, i).into())
                 .await
                 .unwrap();
 
+            let nats_topic_prefix = nats_topic_prefix.clone();
+
             async move {
                 while let Some(request) = subscribtion.next().await {
-                    use crate::schema::order_details::dsl::*;
-
                     let data = request.payload;
                     let order_payload: OrderPayload = serde_json::from_slice(&data).unwrap();                    
 
@@ -87,6 +80,39 @@ async fn main() -> std::io::Result<()> {
                     };
 
                     let order_detail_payload = OrderDetailPayload::from(order_detail_from_inventory);
+                    let order_detail_payload_string = serde_json::to_string(&order_detail_payload).unwrap();
+
+                    nats_client
+                        .publish(
+                            format!("{}:db:{}", nats_topic_prefix, i).into(),
+                            Bytes::from(order_detail_payload_string),
+                        )
+                        .await
+                        .unwrap();
+                }
+                Ok::<(), async_nats::Error>(())
+            }
+        });
+    }
+
+    let db_pool = database_pool.clone();
+
+    for i in 0..16 {
+        tokio::spawn({
+            let db_pool = db_pool.clone();
+            let nats_client = nats_client.clone();
+
+            let mut subscribtion = nats_client
+                .subscribe(format!("{}:db:{}", nats_topic_prefix, i).into())
+                .await
+                .unwrap();
+
+            async move {
+                while let Some(request) = subscribtion.next().await {
+                    use crate::schema::order_details::dsl::*;
+
+                    let data = request.payload;
+                    let order_detail_payload: OrderDetailPayload = serde_json::from_slice(&data).unwrap();    
 
                     loop {
                         let mut conn = match db_pool.get() {
