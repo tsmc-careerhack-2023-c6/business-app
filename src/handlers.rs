@@ -6,6 +6,15 @@ use diesel::prelude::*;
 
 use crate::models::*;
 
+#[get("/health")]
+pub async fn health() -> impl Responder {
+    HttpResponse::Ok().json(
+        HealthCheckResponse {
+            status: "OK".to_string(),
+        }
+    )
+}
+
 #[post("/order")]
 pub async fn order(
     payload: web::Json<OrderPayload>,

@@ -122,3 +122,8 @@ pub struct OrderQuery {
     pub location: String,
     pub date: String,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HealthCheckResponse {
+    pub status: String,
+}

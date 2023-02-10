@@ -22,6 +22,6 @@ futures = "0.3.26"
 rand = "0.8.5"
 
 [profile.release]
-lto = true
+lto = "thin"
 opt-level = 3
 codegen-units = 1

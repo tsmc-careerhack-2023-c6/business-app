@@ -3,12 +3,21 @@ FROM rust:slim AS builder
 WORKDIR /usr/src/business-app
 
 RUN apt-get update && apt-get install -y libpq-dev libssl-dev pkg-config
+RUN apt-get install -y wrk
 
 COPY Cargo.toml .
 COPY Cargo.lock .
 COPY src src
 
-RUN RUSTFLAGS="-C target-cpu=native -C target-feature=+sse3,+avx2,+fma" cargo build --release -j16
+RUN rustup component add llvm-tools-preview
+RUN cargo install cargo-pgo
+
+RUN RUSTFLAGS="-C target-cpu=native -C target-feature=+sse3,+avx2,+fma" cargo pgo instrument build --release -j16
+RUN cargo pgo run &
+RUN wrk -t2 -c64 -d300s --latency http://127.0.0.1:8100/api/health
+RUN killall business-app
+
+RUN RUSTFLAGS="-C target-cpu=native -C target-feature=+sse3,+avx2,+fma" cargo pgo optimize
 
 FROM debian:bullseye-slim
 
