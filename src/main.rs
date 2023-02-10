@@ -6,9 +6,8 @@ use std::sync::Arc;
 use actix_web::{middleware, web, App, HttpServer};
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
-use models::{AppState, OrderDetail, OrderDetailPayload};
+use models::{AppState, OrderDetailPayload};
 
-use bytes::Bytes;
 use futures::StreamExt;
 
 mod handlers;
@@ -54,48 +53,28 @@ async fn main() -> std::io::Result<()> {
 
             async move {
                 while let Some(request) = subscribtion.next().await {
-                    if let Some(reply) = request.reply {
-                        use crate::schema::order_details::dsl::*;
+                    use crate::schema::order_details::dsl::*;
 
-                        let data = request.payload;
+                    let data = request.payload;
 
-                        loop {
-                            let reply_cloned = reply.clone();
-                            let mut conn = match db_pool.get() {
-                                Ok(conn) => conn,
-                                Err(e) => {
-                                    println!("Error: {}", e);
-                                    continue;
-                                }
-                            };
+                    loop {
+                        let mut conn = match db_pool.get() {
+                            Ok(conn) => conn,
+                            Err(e) => {
+                                println!("Error: {}", e);
+                                continue;
+                            }
+                        };
 
-                            // deserialize the payload
-                            let order_detail_payload: OrderDetailPayload =
-                                serde_json::from_slice(&data).unwrap();
-                            // insert the payload into database
-                            let order_detail = diesel::insert_into(order_details)
-                                .values(&order_detail_payload.clone())
-                                .returning((
-                                    id, location, timestamp, signature, material, a, b, c, d,
-                                ))
-                                .get_result::<OrderDetail>(&mut conn);
+                        // deserialize the payload
+                        let order_detail_payload: OrderDetailPayload =
+                            serde_json::from_slice(&data).unwrap();
+                        // insert the payload into database
+                        let _ = diesel::insert_into(order_details)
+                            .values(&order_detail_payload.clone())
+                            .execute(&mut conn);
 
-                            let order_detail = match order_detail {
-                                Ok(order_detail) => order_detail,
-                                Err(e) => {
-                                    println!("Error: {}", e);
-                                    continue;
-                                }
-                            };
-
-                            let order_detail = serde_json::to_string(&order_detail).unwrap();
-                            nats_client
-                                .publish(reply_cloned, Bytes::from(order_detail))
-                                .await
-                                .unwrap();
-
-                            break;
-                        }
+                        break;
                     }
                 }
                 Ok::<(), async_nats::Error>(())

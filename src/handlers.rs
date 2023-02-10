@@ -54,9 +54,10 @@ pub async fn order(
     let order_detail_payload = OrderDetailPayload::from(resp);
 
     let i = rand::random::<u8>() % 16;
-    let response = app_state.nats_client.request(format!("request.{}", i), Bytes::from(serde_json::to_string(&order_detail_payload).unwrap())).await.unwrap();
+    let _  = app_state.nats_client.publish(format!("request.{}", i), Bytes::from(serde_json::to_string(&order_detail_payload).unwrap())).await;
+    // let response = app_state.nats_client.request(format!("request.{}", i), Bytes::from(serde_json::to_string(&order_detail_payload).unwrap())).await.unwrap();
 
-    let order_record: OrderRecord = serde_json::from_slice(&response.payload).unwrap();
+    // let order_record: OrderRecord = serde_json::from_slice(&response.payload).unwrap();
     
     // let web_block_result = web::block(move || {
     //     let mut conn = app_state.db_pool.get().unwrap();
@@ -80,7 +81,9 @@ pub async fn order(
 
     // let order_record = OrderRecord::from(inserted_order);
 
-    HttpResponse::Ok().json(order_record)
+    // HttpResponse::Ok().json(order_record)
+
+    HttpResponse::Ok().finish()
 }
 
 #[get("/record")]
