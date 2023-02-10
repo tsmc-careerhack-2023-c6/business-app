@@ -4,9 +4,10 @@ extern crate diesel;
 use std::sync::Arc;
 
 use actix_web::{middleware, web, App, HttpServer};
+use bytes::Bytes;
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
-use models::{AppState, OrderDetailPayload};
+use models::{AppState, OrderDetailPayload, OrderQuery, OrderDetail, OrderDetailFromInventory, OrderPayload};
 
 use futures::StreamExt;
 
@@ -75,6 +76,131 @@ async fn main() -> std::io::Result<()> {
                             .execute(&mut conn);
 
                         break;
+                    }
+                }
+                Ok::<(), async_nats::Error>(())
+            }
+        });
+    }
+
+    let inventory_url = std::env::var("INVENTORY_URL").expect("INVENTORY_URL must be set");
+
+    for i in 0..16 {
+        let inventory_url_cloned = inventory_url.clone();
+        tokio::spawn({
+            let nats_client = nats_client.clone();
+
+            let mut subscribtion = nats_client
+                .subscribe(format!("inventory.{}", i).into())
+                .await
+                .unwrap();
+
+            async move {
+                while let Some(request) = subscribtion.next().await {
+                    if let Some(reply) = request.reply {
+                        let data = request.payload;
+                        let order_payload: OrderPayload = serde_json::from_slice(&data).unwrap();    
+                        loop {
+                            let resp_result = reqwest::Client::new()
+                                .post(&inventory_url_cloned)
+                                .json(&order_payload)
+                                .send()
+                                .await;
+
+                            if let Err(e) = resp_result {
+                                eprintln!("Error: {}", e);
+                                continue;
+                            }
+
+                            if let Ok(order_detail_from_inventory) = resp_result.unwrap().json::<OrderDetailFromInventory>().await {
+                                // println!("order_detail_from_inventory: {:?}", order_detail_from_inventory);
+                                
+                                let order_detail_from_inventory_string = serde_json::to_string(&order_detail_from_inventory).unwrap();
+                                
+                                nats_client
+                                    .publish(reply, Bytes::from(order_detail_from_inventory_string))
+                                    .await
+                                    .unwrap();
+                            } else {
+                                nats_client
+                                    .publish(reply, Bytes::from("error"))
+                                    .await
+                                    .unwrap();
+                            }
+
+                            break;
+                        }
+                    }
+                }
+                Ok::<(), async_nats::Error>(())
+            }
+        });
+    }
+
+    let db_pool = database_pool.clone();
+
+    for i in 0..16 {
+        tokio::spawn({
+            let db_pool = db_pool.clone();
+            let nats_client = nats_client.clone();
+
+            let mut subscribtion = nats_client
+                .subscribe(format!("record.{}", i).into())
+                .await
+                .unwrap();
+
+            async move {
+                while let Some(request) = subscribtion.next().await {
+                    if let Some(reply) = request.reply {
+                        use crate::schema::order_details::dsl::*;
+
+                        let data = request.payload;
+                        let query = serde_json::from_slice::<OrderQuery>(&data).unwrap();
+    
+                        loop {
+                            let reply_cloned = reply.clone();
+
+                            let mut conn = match db_pool.get() {
+                                Ok(conn) => conn,
+                                Err(e) => {
+                                    println!("Error: {}", e);
+                                    continue;
+                                }
+                            };
+
+                            let start_time = chrono::NaiveDateTime::parse_from_str(
+                                &format!("{} 00:00:00", query.date),
+                                "%Y-%m-%d %H:%M:%S",
+                            )
+                            .unwrap()
+                                - chrono::Duration::hours(8);
+                            let end_time = chrono::NaiveDateTime::parse_from_str(
+                                &format!("{} 23:59:59", query.date),
+                                "%Y-%m-%d %H:%M:%S",
+                            )
+                            .unwrap()
+                                - chrono::Duration::hours(8);
+                    
+                            let query_result = order_details
+                                .filter(location.eq(&query.location))
+                                .filter(timestamp.ge(start_time))
+                                .filter(timestamp.le(end_time))
+                                .load::<OrderDetail>(&mut conn);
+
+                            let _ = match query_result {
+                                Ok(result) => {
+                                    let payload = serde_json::to_vec(&result).unwrap();
+                                    let _ = nats_client.publish(reply_cloned, Bytes::from(payload)).await;
+                                    break;
+                                }
+                                Err(e) => {
+                                    println!("Error: {}", e);
+                                    nats_client.publish(reply_cloned, Bytes::from("error")).await.unwrap();
+                                }
+                            };
+
+                            break;
+                        }
                     }
                 }
                 Ok::<(), async_nats::Error>(())

@@ -7,81 +7,28 @@ use diesel::prelude::*;
 
 use crate::models::*;
 
-// type DbError = Box<dyn std::error::Error + Send + Sync>;
-
-// fn insert_order_detail(
-//     conn: &mut PgConnection,
-//     order_detail_payload: OrderDetailPayload,
-// ) -> Result<OrderDetail, Error> {
-//     use crate::schema::order_details::dsl::*;
-
-//     let result = diesel::insert_into(order_details)
-//         .values(&order_detail_payload.clone())
-//         .returning((id, location, timestamp, signature, material, a, b, c, d))
-//         .get_result::<OrderDetail>(conn);
-
-//     result
-// }
-
 #[post("/order")]
 pub async fn order(
     payload: web::Json<OrderPayload>,
     app_state: web::Data<AppState>,
 ) -> impl Responder {
     dotenv::dotenv().ok();
+    let i = rand::random::<u8>() % 16;
 
-    let inventory_url = std::env::var("INVENTORY_URL").expect("INVENTORY_URL must be set");
+    let order_payload = payload.into_inner();
 
-    let order = payload.into_inner();
-
-    let client = reqwest::Client::new();
-    let resp_res = client
-        .post(inventory_url)
-        .json(&order)
-        .send()
-        .await
-        .unwrap()
-        .json::<OrderDetailFromInventory>()
-        .await;
-
-    if let Err(resp_err) = resp_res {
-        eprintln!("{}", resp_err);
+    let inventory_resp = app_state.nats_client.request(format!("inventory.{}", i), Bytes::from(serde_json::to_string(&order_payload).unwrap())).await.unwrap();
+    let order_detail_from_inevntory_result: Result<OrderDetailFromInventory, serde_json::Error> = serde_json::from_slice(&inventory_resp.payload);
+    
+    if let Err(err) = order_detail_from_inevntory_result {
+        eprintln!("Error: {}", err);
         return HttpResponse::InternalServerError().finish();
     }
 
-    let resp = resp_res.unwrap();
+    let order_detail_from_inevntory: OrderDetailFromInventory = order_detail_from_inevntory_result.unwrap();
+    let order_detail_payload = OrderDetailPayload::from(order_detail_from_inevntory);
 
-    let order_detail_payload = OrderDetailPayload::from(resp);
-
-    let i = rand::random::<u8>() % 16;
     let _  = app_state.nats_client.publish(format!("request.{}", i), Bytes::from(serde_json::to_string(&order_detail_payload).unwrap())).await;
-    // let response = app_state.nats_client.request(format!("request.{}", i), Bytes::from(serde_json::to_string(&order_detail_payload).unwrap())).await.unwrap();
-
-    // let order_record: OrderRecord = serde_json::from_slice(&response.payload).unwrap();
-    
-    // let web_block_result = web::block(move || {
-    //     let mut conn = app_state.db_pool.get().unwrap();
-    //     insert_order_detail(&mut conn, order_detail_payload)
-    // })
-    // .await;
-
-    // if let Err(err) = web_block_result {
-    //     eprintln!("{}", err);
-    //     return HttpResponse::InternalServerError().finish();
-    // }
-
-    // let insert_result = web_block_result.unwrap();
-
-    // if let Err(err) = insert_result {
-    //     eprintln!("{}", err);
-    //     return HttpResponse::InternalServerError().finish();
-    // }
-
-    // let inserted_order = insert_result.unwrap();
-
-    // let order_record = OrderRecord::from(inserted_order);
-
-    // HttpResponse::Ok().json(order_record)
 
     HttpResponse::Ok().finish()
 }
@@ -94,24 +41,6 @@ pub async fn record(
     use crate::schema::order_details::dsl::*;
 
     let query_ref = Arc::new(query);
-
-    // let cloned_app_state = app_state.clone();
-
-    // let key = format!("record:{}:{}", query_ref.date, query_ref.location);
-
-    // let redis_result: RedisValue = app_state
-    //     .redis_pool
-    //     .get(&key)
-    //     .await
-    //     .unwrap();
-
-    // if let RedisValue::String(redis_string) = redis_result {
-    //     println!("Found cache in redis");
-
-    //     let order_records: Vec<OrderRecord> = serde_json::from_str(&redis_string).unwrap();
-
-    //     return HttpResponse::Ok().json(order_records);
-    // }
 
     let web_block_result = web::block(move || {
         let mut conn = app_state.db_pool.get().unwrap();

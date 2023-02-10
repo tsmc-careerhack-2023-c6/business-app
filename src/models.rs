@@ -13,7 +13,7 @@ pub struct AppState {
     pub nats_client: Arc<Client>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Data {
     pub a: i32,
     pub b: i32,
@@ -21,14 +21,14 @@ pub struct Data {
     pub d: i32,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OrderPayload {
     pub location: String,
     pub timestamp: String,
     pub data: Data,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OrderDetailFromInventory {
     pub location: String,
     pub timestamp: String,
@@ -37,7 +37,7 @@ pub struct OrderDetailFromInventory {
     pub data: Data,
 }
 
-#[derive(Serialize, Deserialize, Clone, Queryable)]
+#[derive(Debug, Serialize, Deserialize, Clone, Queryable)]
 pub struct OrderDetail {
     pub id: i32,
     pub location: String,
@@ -50,7 +50,7 @@ pub struct OrderDetail {
     pub d: i32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Insertable)]
+#[derive(Debug, Serialize, Deserialize, Clone, Insertable)]
 #[diesel(table_name = order_details)]
 pub struct OrderDetailPayload {
     pub location: String,
@@ -78,7 +78,7 @@ impl From<OrderDetailFromInventory> for OrderDetailPayload {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OrderRecord {
     pub location: String,
     pub timestamp: String,
@@ -105,7 +105,7 @@ impl From<OrderDetail> for OrderRecord {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OrderReport {
     pub location: String,
     pub date: String,
@@ -117,7 +117,7 @@ pub struct OrderReport {
     pub d: i32,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OrderQuery {
     pub location: String,
     pub date: String,
