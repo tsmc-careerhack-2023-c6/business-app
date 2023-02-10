@@ -8,7 +8,7 @@ COPY Cargo.toml .
 COPY Cargo.lock .
 COPY src src
 
-RUN cargo build --release -j16
+RUN RUSTFLAGS="-C target-cpu=native -C target-feature=+sse3,+avx2,+fma" cargo build --release -j16
 
 FROM debian:bullseye-slim
 
