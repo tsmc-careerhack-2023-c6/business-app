@@ -1,4 +1,4 @@
-CREATE TABLE order_details (
+CREATE UNLOGGED TABLE order_details (
     id        SERIAL NOT NULL PRIMARY KEY,
     location  TEXT NOT NULL,
     timestamp TIMESTAMP WITH time zone NOT NULL,
@@ -8,4 +8,4 @@ CREATE TABLE order_details (
     b         INTEGER NOT NULL,
     c         INTEGER NOT NULL,
     d         INTEGER NOT NULL
-); 
+) WITH (autovacuum_enabled=false); 

@@ -10,6 +10,7 @@ services:
       - db.env
     ports:
       - 15432:5432
+    command: postgres -c shared_buffers=2GB -c max_connections=200
   adminer:
     image: adminer:latest
     restart: always
