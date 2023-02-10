@@ -34,16 +34,14 @@ pub async fn record(
     let web_block_result = web::block(move || {
         let mut conn = app_state.db_pool.get().unwrap();
 
+        println!("{} {}", &query_ref.date, &query_ref.location);
+
         let start_time = chrono::NaiveDateTime::parse_from_str(
-            query_ref.date.as_str(),
-            "%Y-%m-%d",
+            format!("{} 00:00:00", &query_ref.date).as_str(),
+            "%Y-%m-%d %H:%M:%S",
         )
         .unwrap();
-        let end_time = chrono::NaiveDateTime::parse_from_str(
-            query_ref.date.as_str(),
-            "%Y-%m-%d",
-        )
-        .unwrap() + chrono::Duration::days(1);
+        let end_time = start_time + chrono::Duration::days(1);
 
         order_details
             .filter(location.eq(&query_ref.location))
@@ -88,15 +86,11 @@ pub async fn report(
         let mut conn = app_state.db_pool.get().unwrap();
 
         let start_time = chrono::NaiveDateTime::parse_from_str(
-            query_ref.date.as_str(),
-            "%Y-%m-%d",
+            format!("{} 00:00:00", &query_ref.date).as_str(),
+            "%Y-%m-%d %H:%M:%S",
         )
         .unwrap();
-        let end_time = chrono::NaiveDateTime::parse_from_str(
-            query_ref.date.as_str(),
-            "%Y-%m-%d",
-        )
-        .unwrap() + chrono::Duration::days(1);
+        let end_time = start_time + chrono::Duration::days(1);
 
         order_details
             .filter(location.eq(&query_ref.location))
