@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
 use async_nats::Client;
-use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
-use chrono_tz::Asia;
 
 use crate::schema::order_details;
 
@@ -41,7 +39,7 @@ pub struct OrderDetailFromInventory {
 pub struct OrderDetail {
     pub id: i32,
     pub location: String,
-    pub timestamp: chrono::NaiveDateTime,
+    pub timestamp: String,
     pub signature: String,
     pub material: i32,
     pub a: i32,
@@ -54,7 +52,7 @@ pub struct OrderDetail {
 #[diesel(table_name = order_details)]
 pub struct OrderDetailPayload {
     pub location: String,
-    pub timestamp: chrono::DateTime<FixedOffset>,
+    pub timestamp: String,
     pub signature: String,
     pub material: i32,
     pub a: i32,
@@ -67,7 +65,7 @@ impl From<OrderDetailFromInventory> for OrderDetailPayload {
     fn from(order_detail_from_inventory: OrderDetailFromInventory) -> Self {
         OrderDetailPayload {
             location: order_detail_from_inventory.location,
-            timestamp: chrono::DateTime::parse_from_rfc3339(&order_detail_from_inventory.timestamp).unwrap(),
+            timestamp: order_detail_from_inventory.timestamp,
             signature: order_detail_from_inventory.signature,
             material: order_detail_from_inventory.material,
             a: order_detail_from_inventory.data.a,
@@ -94,7 +92,7 @@ impl From<OrderDetail> for OrderRecord {
     fn from(order_detail: OrderDetail) -> Self {
         OrderRecord {
             location: order_detail.location,
-            timestamp: (order_detail.timestamp + chrono::Duration::hours(8)).and_local_timezone(Asia::Taipei).unwrap().to_rfc3339(),
+            timestamp: order_detail.timestamp,
             signature: order_detail.signature,
             material: order_detail.material,
             a: order_detail.a,

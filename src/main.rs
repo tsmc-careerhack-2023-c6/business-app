@@ -141,24 +141,10 @@ async fn main() -> std::io::Result<()> {
                                     continue;
                                 }
                             };
-
-                            let start_time = chrono::NaiveDateTime::parse_from_str(
-                                &format!("{} 00:00:00", query.date),
-                                "%Y-%m-%d %H:%M:%S",
-                            )
-                            .unwrap()
-                                - chrono::Duration::hours(8);
-                            let end_time = chrono::NaiveDateTime::parse_from_str(
-                                &format!("{} 23:59:59", query.date),
-                                "%Y-%m-%d %H:%M:%S",
-                            )
-                            .unwrap()
-                                - chrono::Duration::hours(8);
                     
                             let query_result = order_details
                                 .filter(location.eq(&query.location))
-                                .filter(timestamp.ge(start_time))
-                                .filter(timestamp.le(end_time))
+                                .filter(timestamp.like(format!("{}%", &query.date)))
                                 .load::<OrderDetail>(&mut conn);
 
                             let _ = match query_result {

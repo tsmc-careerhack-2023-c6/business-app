@@ -4,7 +4,7 @@ diesel::table! {
     order_details (id) {
         id -> Int4,
         location -> Text,
-        timestamp -> Timestamptz,
+        timestamp -> Text,
         signature -> Text,
         material -> Int4,
         a -> Int4,

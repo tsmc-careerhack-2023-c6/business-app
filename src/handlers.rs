@@ -35,23 +35,9 @@ pub async fn record(
     let web_block_result = web::block(move || {
         let mut conn = app_state.db_pool.get().unwrap();
 
-        let start_time = chrono::NaiveDateTime::parse_from_str(
-            &format!("{} 00:00:00", query_ref.date),
-            "%Y-%m-%d %H:%M:%S",
-        )
-        .unwrap()
-            - chrono::Duration::hours(8);
-        let end_time = chrono::NaiveDateTime::parse_from_str(
-            &format!("{} 23:59:59", query_ref.date),
-            "%Y-%m-%d %H:%M:%S",
-        )
-        .unwrap()
-            - chrono::Duration::hours(8);
-
         order_details
             .filter(location.eq(&query_ref.location))
-            .filter(timestamp.ge(start_time))
-            .filter(timestamp.le(end_time))
+            .filter(timestamp.like(format!("{}%", query_ref.date)))
             .load::<OrderDetail>(&mut conn)
     })
     .await;
@@ -123,23 +109,9 @@ pub async fn report(
     let web_block_result = web::block(move || {
         let mut conn = app_state.db_pool.get().unwrap();
 
-        let start_time = chrono::NaiveDateTime::parse_from_str(
-            &format!("{} 00:00:00", query_ref.date),
-            "%Y-%m-%d %H:%M:%S",
-        )
-        .unwrap()
-            - chrono::Duration::hours(8);
-        let end_time = chrono::NaiveDateTime::parse_from_str(
-            &format!("{} 23:59:59", query_ref.date),
-            "%Y-%m-%d %H:%M:%S",
-        )
-        .unwrap()
-            - chrono::Duration::hours(8);
-
         order_details
             .filter(location.eq(&query_ref.location))
-            .filter(timestamp.ge(start_time))
-            .filter(timestamp.le(end_time))
+            .filter(timestamp.like(format!("{}%", query_ref.date)))
             .load::<OrderDetail>(&mut conn)
     })
     .await;
