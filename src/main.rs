@@ -43,6 +43,8 @@ async fn main() -> std::io::Result<()> {
     let inventory_url = std::env::var("INVENTORY_URL").expect("INVENTORY_URL must be set");
     let db_pool = database_pool.clone();
 
+    let nats_topic_prefix = std::env::var("NATS_TOPIC_PREFIX").expect("NATS_TOPIC_PREFIX must be set");
+
     for i in 0..16 {
         let inventory_url_cloned = inventory_url.clone();
 
@@ -51,7 +53,7 @@ async fn main() -> std::io::Result<()> {
             let nats_client = nats_client.clone();
 
             let mut subscribtion = nats_client
-                .subscribe(format!("inventory_to_db.{}", i).into())
+                .subscribe(format!("{}_inventory_to_db.{}", nats_topic_prefix, i).into())
                 .await
                 .unwrap();
 

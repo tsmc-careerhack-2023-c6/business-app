@@ -17,7 +17,8 @@ pub async fn order(
 
     let order_payload = payload.into_inner();
 
-    let _ = app_state.nats_client.publish(format!("inventory_to_db.{}", i), Bytes::from(serde_json::to_string(&order_payload).unwrap())).await.unwrap();
+    let nats_topic_prefix = std::env::var("NATS_TOPIC_PREFIX").expect("NATS_TOPIC_PREFIX must be set");
+    let _ = app_state.nats_client.publish(format!("{}_inventory_to_db.{}", nats_topic_prefix, i), Bytes::from(serde_json::to_string(&order_payload).unwrap())).await.unwrap();
 
     HttpResponse::Ok().finish()
 }
