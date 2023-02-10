@@ -150,19 +150,5 @@ pub async fn report(
             .sum(),
     };
 
-    // println!("Set cache in redis");
-
-    // let _: () = cloned_app_state
-    //     .redis_pool
-    //     .set(
-    //         &key,
-    //         serde_json::to_string(&order_report).unwrap(),
-    //         Some(Expiration::EX(10)),
-    //         None,
-    //         false,
-    //     )
-    //     .await
-    //     .unwrap();
-
     HttpResponse::Ok().json(order_report)
 }
