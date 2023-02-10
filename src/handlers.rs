@@ -3,7 +3,6 @@ use std::sync::Arc;
 use actix_web::{get, post, web, HttpResponse, Responder};
 use bytes::Bytes;
 use diesel::prelude::*;
-// use diesel::result::Error;
 
 use crate::models::*;
 
@@ -36,35 +35,32 @@ pub async fn record(
         let mut conn = app_state.db_pool.get().unwrap();
 
         let start_time = chrono::NaiveDateTime::parse_from_str(
-            &format!("{} 00:00:00", query_ref.date),
-            "%Y-%m-%d %H:%M:%S",
+            query_ref.date.as_str(),
+            "%Y-%m-%d",
         )
-        .unwrap()
-            - chrono::Duration::hours(8);
+        .unwrap();
         let end_time = chrono::NaiveDateTime::parse_from_str(
-            &format!("{} 23:59:59", query_ref.date),
-            "%Y-%m-%d %H:%M:%S",
+            query_ref.date.as_str(),
+            "%Y-%m-%d",
         )
-        .unwrap()
-            - chrono::Duration::hours(8);
+        .unwrap() + chrono::Duration::days(1);
 
         order_details
             .filter(location.eq(&query_ref.location))
-            .filter(timestamp.ge(start_time))
-            .filter(timestamp.le(end_time))
+            .filter(timestamp.between(start_time, end_time))
             .load::<OrderDetail>(&mut conn)
     })
     .await;
 
-    if let Err(err) = web_block_result {
-        eprintln!("{}", err);
+    if let Err(_) = web_block_result {
+        // eprintln!("{}", err);
         return HttpResponse::InternalServerError().finish();
     }
 
     let query_result = web_block_result.unwrap();
 
-    if let Err(err) = query_result {
-        eprintln!("{}", err);
+    if let Err(_) = query_result {
+        // eprintln!("{}", err);
         return HttpResponse::InternalServerError().finish();
     }
 
@@ -74,20 +70,6 @@ pub async fn record(
         .into_iter()
         .map(|order_detail| OrderRecord::from(order_detail))
         .collect();
-
-    // println!("Set cache in redis");
-
-    // let _: () = cloned_app_state
-    //     .redis_pool
-    //     .set(
-    //         &key,
-    //         serde_json::to_string(&order_records).unwrap(),
-    //         Some(Expiration::EX(10)),
-    //         None,
-    //         false,
-    //     )
-    //     .await
-    //     .unwrap();
 
     HttpResponse::Ok().json(order_records)
 }
@@ -102,57 +84,36 @@ pub async fn report(
     let query_ref = Arc::new(query);
     let cloned_query_ref = query_ref.clone();
 
-    // let cloned_app_state = app_state.clone();
-
-    // let key = format!("report:{}:{}", query_ref.date, query_ref.location);
-
-    // let redis_result: RedisValue = app_state
-    //     .redis_pool
-    //     .get(&key)
-    //     .await
-    //     .unwrap();
-
-    // if let RedisValue::String(redis_string) = redis_result {
-    //     println!("Found cache in redis");
-
-    //     let order_report: OrderReport = serde_json::from_str(&redis_string).unwrap();
-
-    //     return HttpResponse::Ok().json(order_report);
-    // }
-
     let web_block_result = web::block(move || {
         let mut conn = app_state.db_pool.get().unwrap();
 
         let start_time = chrono::NaiveDateTime::parse_from_str(
-            &format!("{} 00:00:00", query_ref.date),
-            "%Y-%m-%d %H:%M:%S",
+            query_ref.date.as_str(),
+            "%Y-%m-%d",
         )
-        .unwrap()
-            - chrono::Duration::hours(8);
+        .unwrap();
         let end_time = chrono::NaiveDateTime::parse_from_str(
-            &format!("{} 23:59:59", query_ref.date),
-            "%Y-%m-%d %H:%M:%S",
+            query_ref.date.as_str(),
+            "%Y-%m-%d",
         )
-        .unwrap()
-            - chrono::Duration::hours(8);
+        .unwrap() + chrono::Duration::days(1);
 
         order_details
             .filter(location.eq(&query_ref.location))
-            .filter(timestamp.ge(start_time))
-            .filter(timestamp.le(end_time))
+            .filter(timestamp.between(start_time, end_time))
             .load::<OrderDetail>(&mut conn)
     })
     .await;
 
-    if let Err(err) = web_block_result {
-        eprintln!("{}", err);
+    if let Err(_) = web_block_result {
+        // eprintln!("{}", err);
         return HttpResponse::InternalServerError().finish();
     }
 
     let query_result = web_block_result.unwrap();
 
-    if let Err(err) = query_result {
-        eprintln!("{}", err);
+    if let Err(_) = query_result {
+        // eprintln!("{}", err);
         return HttpResponse::InternalServerError().finish();
     }
 
