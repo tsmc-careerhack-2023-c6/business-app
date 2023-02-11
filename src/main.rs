@@ -7,7 +7,7 @@ use actix_web::{middleware, web, App, HttpServer};
 use bytes::Bytes;
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
-use models::{AppState, OrderDetailPayload, OrderDetailFromInventory, OrderPayload};
+use models::{AppState, OrderDetailFromInventory, OrderDetailPayload, OrderPayload};
 
 use futures::StreamExt;
 
@@ -23,11 +23,10 @@ async fn main() -> std::io::Result<()> {
 
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
-    let num_logical_processors = std::env::var("NUM_LOGICAL_PROCESSORS")
-        .expect("NUM_LOGICAL_PROCESSORS must be set")
-        .parse::<usize>();
+    let num_logical_processors_result = std::env::var("NUM_LOGICAL_PROCESSORS")
+        .map(|num_logical_processors| num_logical_processors.parse::<usize>().unwrap());
 
-    let num_logical_processors = match num_logical_processors {
+    let num_logical_processors = match num_logical_processors_result {
         Ok(num_logical_processors) => num_logical_processors,
         Err(_) => num_cpus::get(),
     };
@@ -43,8 +42,9 @@ async fn main() -> std::io::Result<()> {
     let nats_url = std::env::var("NATS_URL").expect("NATS_URL must be set");
     let nats_client = Arc::new(async_nats::connect(&nats_url).await.unwrap());
 
-    let nats_topic_prefix = std::env::var("NATS_TOPIC_PREFIX").expect("NATS_TOPIC_PREFIX must be set");
-    
+    let nats_topic_prefix =
+        std::env::var("NATS_TOPIC_PREFIX").expect("NATS_TOPIC_PREFIX must be set");
+
     let inventory_url = std::env::var("INVENTORY_URL").expect("INVENTORY_URL must be set");
 
     for i in 0..num_logical_processors {
@@ -63,7 +63,7 @@ async fn main() -> std::io::Result<()> {
             async move {
                 while let Some(request) = subscribtion.next().await {
                     let data = request.payload;
-                    let order_payload: OrderPayload = serde_json::from_slice(&data).unwrap();                    
+                    let order_payload: OrderPayload = serde_json::from_slice(&data).unwrap();
 
                     let order_detail_from_inventory = loop {
                         let resp_result = reqwest::Client::new()
@@ -77,7 +77,11 @@ async fn main() -> std::io::Result<()> {
                             continue;
                         }
 
-                        match resp_result.unwrap().json::<OrderDetailFromInventory>().await {
+                        match resp_result
+                            .unwrap()
+                            .json::<OrderDetailFromInventory>()
+                            .await
+                        {
                             Ok(order_detail_from_inventory) => {
                                 break order_detail_from_inventory;
                             }
@@ -88,8 +92,10 @@ async fn main() -> std::io::Result<()> {
                         }
                     };
 
-                    let order_detail_payload = OrderDetailPayload::from(order_detail_from_inventory);
-                    let order_detail_payload_string = serde_json::to_string(&order_detail_payload).unwrap();
+                    let order_detail_payload =
+                        OrderDetailPayload::from(order_detail_from_inventory);
+                    let order_detail_payload_string =
+                        serde_json::to_string(&order_detail_payload).unwrap();
 
                     nats_client
                         .publish(
@@ -121,7 +127,8 @@ async fn main() -> std::io::Result<()> {
                     use crate::schema::order_details::dsl::*;
 
                     let data = request.payload;
-                    let order_detail_payload: OrderDetailPayload = serde_json::from_slice(&data).unwrap();    
+                    let order_detail_payload: OrderDetailPayload =
+                        serde_json::from_slice(&data).unwrap();
 
                     loop {
                         let mut conn = match db_pool.get() {
