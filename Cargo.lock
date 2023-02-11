@@ -364,6 +364,7 @@ dependencies = [
  "dotenv",
  "env_logger",
  "futures",
+ "num_cpus",
  "rand",
  "reqwest",
  "serde",

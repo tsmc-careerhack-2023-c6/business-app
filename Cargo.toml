@@ -20,6 +20,7 @@ async-nats = "0.27.1"
 bytes = "1.4.0"
 futures = "0.3.26"
 rand = "0.8.5"
+num_cpus = "1.15.0"
 
 [profile.release]
 lto = true

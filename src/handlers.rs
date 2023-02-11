@@ -11,13 +11,10 @@ pub async fn order(
     payload: web::Json<OrderPayload>,
     app_state: web::Data<AppState>,
 ) -> impl Responder {
-    dotenv::dotenv().ok();
-    let i = rand::random::<u8>() % 16;
+    let i = rand::random::<u8>() % app_state.num_logical_processors as u8;
 
     let order_payload = payload.into_inner();
-
-    let nats_topic_prefix = std::env::var("NATS_TOPIC_PREFIX").expect("NATS_TOPIC_PREFIX must be set");
-    let _ = app_state.nats_client.publish(format!("{}:inventory:{}", nats_topic_prefix, i), Bytes::from(serde_json::to_string(&order_payload).unwrap())).await.unwrap();
+    let _ = app_state.nats_client.publish(format!("{}:inventory:{}", app_state.nats_topic_prefix, i), Bytes::from(serde_json::to_string(&order_payload).unwrap())).await.unwrap();
 
     HttpResponse::Ok().finish()
 }

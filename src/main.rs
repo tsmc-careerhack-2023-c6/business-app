@@ -23,6 +23,15 @@ async fn main() -> std::io::Result<()> {
 
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
+    let num_logical_processors = std::env::var("NUM_LOGICAL_PROCESSORS")
+        .expect("NUM_LOGICAL_PROCESSORS must be set")
+        .parse::<usize>();
+
+    let num_logical_processors = match num_logical_processors {
+        Ok(num_logical_processors) => num_logical_processors,
+        Err(_) => num_cpus::get(),
+    };
+
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     let database_pool = Arc::new(
@@ -38,7 +47,7 @@ async fn main() -> std::io::Result<()> {
     
     let inventory_url = std::env::var("INVENTORY_URL").expect("INVENTORY_URL must be set");
 
-    for i in 0..16 {
+    for i in 0..num_logical_processors {
         let inventory_url_cloned = inventory_url.clone();
 
         tokio::spawn({
@@ -97,7 +106,7 @@ async fn main() -> std::io::Result<()> {
 
     let db_pool = database_pool.clone();
 
-    for i in 0..16 {
+    for i in 0..num_logical_processors {
         tokio::spawn({
             let db_pool = db_pool.clone();
             let nats_client = nats_client.clone();
@@ -142,8 +151,9 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(AppState {
                 db_pool: db_pool.clone(),
-                // redis_pool: redis_pool.clone(),
                 nats_client: nats_client.clone(),
+                nats_topic_prefix: nats_topic_prefix.clone(),
+                num_logical_processors,
             }))
             .wrap(middleware::Logger::default())
             .service(
@@ -153,7 +163,7 @@ async fn main() -> std::io::Result<()> {
                     .service(handlers::report),
             )
     })
-    .workers(16)
+    .workers(num_logical_processors)
     .bind("0.0.0.0:8100")?
     .run()
     .await

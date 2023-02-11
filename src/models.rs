@@ -9,8 +9,9 @@ use crate::schema::order_details;
 
 pub struct AppState {
     pub db_pool: Arc<crate::DbPool>,
-    // pub redis_pool: Arc<RedisPool>,
     pub nats_client: Arc<Client>,
+    pub nats_topic_prefix: String,
+    pub num_logical_processors: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
